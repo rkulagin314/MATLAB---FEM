@@ -1,0 +1,282 @@
+%% input data
+a=10; % length of the beam
+sa=1; % size of cross section
+ar=sa*sa; % area of cross section
+E=100; % modulus of elasticity
+J=sa^4/12;% second moment of area
+ez=[1 0 1 0 0.5 0 0 0 0.5 1 1 0]; % 12 stiffnesses of beams of a unit cell (can be 0 / 0.5 / 1)
+
+%% generation of coordinates and connectivites
+b=(a^2-(0.5*a)^2)^0.5;
+for i=1:12
+        if ez(i)<=1/3
+            mix(i)=0.2;
+        elseif ez(i)<=2/3
+            mix(i)=0.6;
+        else
+            mix(i)=1;
+        end
+    end
+k=1; s=0;
+for i=1:13
+    for j=1:(13-s)
+        xn(k)=(13-s-1)*a*(j-1)/(13-s-1)+0.5*s*a;
+        yn(k)=(13-1)*b*(i-1)/(13-1);
+        k=k+1;
+    end
+    if s==0
+        s=1;
+    else
+        s=0;
+    end
+end
+k=k-1; ke=1; s=0; s12=0; s34=0;
+for i=1:13
+    if s==1
+        if s12==1
+            s12=0;
+        else
+            s12=1;
+        end
+    end
+    for j=1:(13-s-1)
+        i1(ke)=j+round((i-1)*(13-0.5));
+        i2(ke)=j+1+round((i-1)*(13-0.5));
+            if s==0
+                if s12==0
+                    i3(ke)=mix(1);
+                    s12=1;
+                else
+                    i3(ke)=mix(2);
+                    s12=0;
+                end
+            else
+                if s34==0
+                    i3(ke)=mix(3);
+                    s34=1;
+                else
+                    i3(ke)=mix(4);
+                    s34=0;
+                end
+            end
+        ke=ke+1;
+    end
+    if s==0
+        s=1;
+    else
+        s=0;
+    end
+end
+s=0; s56=0; s78=1;
+for i=1:(13-1)
+    if s==1
+        if s56==1
+            s56=0;
+        else
+            s56=1;
+        end
+    end
+    if s==1
+        if s78==1
+            s78=0;
+        else
+            s78=1;
+        end
+    end
+    for j=1:(13-1)
+        i1(ke)=j+round((i-1)*(13-0.5));
+        i2(ke)=j+s+round((i-0)*(13-0.5));
+        
+            if s==0
+                if s56==0
+                    i3(ke)=mix(5);
+                    s56=1;
+                else
+                    i3(ke)=mix(6);
+                    s56=0;
+                end
+            else
+                if s78==0
+                    i3(ke)=mix(7);
+                    s78=1;
+                else
+                    i3(ke)=mix(8);
+                    s78=0;
+                end
+            end
+        
+        ke=ke+1;
+    end
+    if s==0
+        s=1;
+    else
+        s=0;
+    end
+end
+s=0; s910=0; s1112=0;
+for i=1:(13-1)
+    if s==1
+        if s910==1
+            s910=0;
+        else
+            s910=1;
+        end
+    end
+    if s==1
+        if s1112==1
+            s1112=0;
+        else
+            s1112=1;
+        end
+    end
+    for j=1:(13-1)
+        i1(ke)=j+1+round((i-1)*(13-0.5))-s;
+        i2(ke)=j+round((i-0)*(13-0.5));
+        
+            if s==0
+                if s910==0
+                    i3(ke)=mix(9);
+                    s910=1;
+                else
+                    i3(ke)=mix(10);
+                    s910=0;
+                end
+            else
+                if s1112==0
+                    i3(ke)=mix(11);
+                    s1112=1;
+                else
+                    i3(ke)=mix(12);
+                    s1112=0;
+                end
+            end
+        ke=ke+1;
+    end
+    if s==0
+        s=1;
+    else
+        s=0;
+    end
+end
+ke=ke-1;
+
+%% stiffness matrix (RR)
+RR=zeros(3*k,3*k);
+    for i=1:ke
+        kk=zeros(3*k,3*k);
+        lx=xn(i2(i))-xn(i1(i));
+        ly=yn(i2(i))-yn(i1(i));
+        ll=(lx^2+ly^2)^0.5;
+        ax=lx/ll;
+        ay=ly/ll;
+        h11=ar*E*i3(i)/ll;
+        h22=12*E*i3(i)*J/ll^3;
+        h23=6*E*i3(i)*J/ll^2;
+        h32=6*E*i3(i)*J/ll^2;
+        h33=4*E*i3(i)*J/ll;
+        hh=[h11,0,0,-h11,0,0;
+            0,h22,h23,0,-h22,h23;
+            0,h32,h33,0,-h32,h33/2;
+            -h11,0,0,h11,0,0;
+            0,-h22,-h23,0,h22,-h23;
+            0,h32,h33/2,0,-h32,h33];
+        T=[ax,ay,0,0,0,0;
+            -ay,ax,0,0,0,0;
+            0,0,1,0,0,0;
+            0,0,0,ax,ay,0;
+            0,0,0,-ay,ax,0;
+            0,0,0,0,0,1];
+        h=T'*hh*T;
+        k1=3*i1(i)-2; k2=3*i1(i); k3=3*i2(i)-2; k4=3*i2(i);
+        kk(k1:k2,k1:k2)=h(1:3,1:3);
+        kk(k1:k2,k3:k4)=h(1:3,4:6);
+        kk(k3:k4,k1:k2)=h(4:6,1:3);
+        kk(k3:k4,k3:k4)=h(4:6,4:6);
+        RR=RR+kk;
+    end
+    
+%% boundary conditions
+i=82;
+RR(3*i-2,3*i-2)=10^13;
+RR(3*i-1,3*i-1)=10^13;
+RR(3*i-0,3*i-0)=10^13;
+k_l=[1,26,51,76,101,126,151];
+k_r=[13,38,63,88,113,138,163];
+k_b=[1,3,5,7,9,11,13];
+k_t=[151,153,155,157,159,161,163];
+
+%% solution
+Kraft_X=0.01; PP=zeros(3*k,1);
+for i=1:7
+    PP(3*k_l(i)-2,1)=-Kraft_X;
+    PP(3*k_r(i)-2,1)=Kraft_X;
+end
+ZZ=inv(RR)*PP;
+for i=1:k
+    xk1(i)=xn(i)+ZZ(3*i-2);
+    yk1(i)=yn(i)+ZZ(3*i-1);
+end
+e11=((xk1(88)-xk1(76))-(xn(88)-xn(76)))/(xn(88)-xn(76));
+sig11=1*7*Kraft_X/13/b/sa;
+ss_1111=e11/sig11;
+Kraft_Y=0.01; PP=zeros(3*k,1);
+for i=1:7
+    PP(3*k_b(i)-1,1)=-Kraft_Y;
+    PP(3*k_t(i)-1,1)=Kraft_Y;
+end
+ZZ=inv(RR)*PP;
+for i=1:k
+    xk2(i)=xn(i)+ZZ(3*i-2);
+    yk2(i)=yn(i)+ZZ(3*i-1);
+end
+e11=((xk2(88)-xk2(76))-(xn(88)-xn(76)))/(xn(88)-xn(76));
+e22=((yk2(157)-yk2(7))-(yn(157)-yn(7)))/(yn(157)-yn(7));
+sig22=1*7*Kraft_Y/13/a/sa;
+ss_2222=e22/sig22;
+ss_1122=e11/sig22;
+Kraft_X=0.01; Kraft_Y=Kraft_X*b/a; PP=zeros(3*k,1);
+for i=1:7
+     PP(3*k_b(i)-2,1)=-Kraft_X;
+     PP(3*k_t(i)-2,1)=Kraft_X;
+     PP(3*k_l(i)-1,1)=-Kraft_Y;
+     PP(3*k_r(i)-1,1)=Kraft_Y;
+end
+ZZ=inv(RR)*PP;
+for i=1:k
+    xk3(i)=xn(i)+ZZ(3*i-2);
+    yk3(i)=yn(i)+ZZ(3*i-1);
+end
+e11=((xk3(88)-xk3(76))-(xn(88)-xn(76)))/(xn(88)-xn(76));
+e22=((yk3(157)-yk3(7))-(yn(157)-yn(7)))/(yn(157)-yn(7));
+e12=((xk3(157)-xk3(7))/(yk3(157)-yk3(7))+...
+    (yk3(88)-yk3(76))/(xk3(88)-xk3(76)))/2;
+sig12=1*7*Kraft_Y/13/b/sa;
+sig21=1*7*Kraft_X/13/a/sa;
+ss_1112=e11/(sig12+sig21);
+ss_2212=e22/(sig12+sig21);
+ss_1212=e12/(sig12+sig21);
+
+%% results - 6 normalized components of the 2D elastic compliance tensor
+res=E.*[ss_1111,ss_2222,ss_1122,ss_1112,ss_2212,ss_1212];
+
+%% drawing mesh pattern
+figure(1);
+clf
+axes1 = axes('FontName','Times New Roman','FontSize',14,'PlotBoxAspectRatio',[15 15 15]);
+box(axes1,'off'); grid(axes1,'on'); hold(axes1,'all'); axis off
+for i=1:ke
+    if i3(i)==1
+        plot([xn(i1(i)) xn(i2(i))],[yn(i1(i)) yn(i2(i))],'Color',1/255*[0,150,130],'LineWidth',2)
+    elseif i3(i)==0.2
+        plot([xn(i1(i)) xn(i2(i))],[yn(i1(i)) yn(i2(i))],'Color',1/255*[222,222,222],'LineWidth',2)
+    elseif i3(i)==0.6    
+        plot([xn(i1(i)) xn(i2(i))],[yn(i1(i)) yn(i2(i))],'Color',1/255*[0,200,255],'LineWidth',2)
+    end
+end
+plot(xn,yn,'o','MarkerSize',3,'LineWidth',2,'MarkerEdgeColor',1/255*[50,50,50],'MarkerFaceColor',1/255*[255,255,255])
+
+%% clear memory
+clear a ar ax ay b E e11 e12 e22 ez h h11 h22 h23 h32 h33 hh i i1 i2 i3 j J
+clear k k1 k2 k3 k4 k_b k_l k_r k_t ke kk Kraft_X Kraft_Y ll lx ly mix PP RR
+clear s s1112 s12 s34 s56 s78 s910 sa sig11 sig12 sig21 sig22 axes1
+clear ss_1111 ss_2222 ss_1122 ss_1112 ss_2212 ss_1212 T xn yn ZZ xk1 yk1 xk2 yk2 xk3 yk3
